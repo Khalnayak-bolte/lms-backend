@@ -1,6 +1,16 @@
-const User = require('../models/User');
 const jwt = require('jsonwebtoken');
+const User = require('../models/User');
 
+// Generate JWT token
+const generateToken = (user) => {
+  return jwt.sign(
+    { id: user._id, role: user.role },
+    process.env.JWT_SECRET,
+    { expiresIn: '1d' }
+  );
+};
+
+// Register new user
 exports.signup = async (req, res) => {
   try {
     const { name, email, password, role } = req.body;
@@ -11,26 +21,34 @@ exports.signup = async (req, res) => {
 
     const existingUser = await User.findOne({ email: email.toLowerCase() });
     if (existingUser) {
-      return res.status(400).json({ message: 'Email already exists' });
+      return res.status(409).json({ message: 'Email already registered' });
     }
 
-    // Let the User model handle hashing via pre-save middleware
     const user = new User({
       name,
       email: email.toLowerCase(),
       password,
-      role,
+      role: role.toLowerCase(), // ✅ ensures consistent role matching
     });
 
     await user.save();
 
-    res.status(201).json({ message: 'User created successfully' });
+    const token = generateToken(user);
+
+    res.status(201).json({
+      message: 'Signup successful',
+      token,
+      role: user.role,
+      name: user.name,
+      userId: user._id,
+    });
   } catch (error) {
     console.error('Signup error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };
 
+// Login existing user
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -40,22 +58,23 @@ exports.login = async (req, res) => {
     }
 
     const user = await User.findOne({ email: email.toLowerCase() });
+
     if (!user) {
-      console.warn('Login failed: Email not found');
+      console.warn('❌ Login failed: Email not found →', email);
       return res.status(400).json({ message: 'Invalid credentials' });
     }
 
-    const isMatch = await user.matchPassword(password); // Use the instance method
+    const isMatch = await user.matchPassword(password);
+    console.log(`🔍 Password match for ${email}:`, isMatch);
+
     if (!isMatch) {
-      console.warn('Login failed: Incorrect password');
+      console.warn('❌ Login failed: Incorrect password');
       return res.status(400).json({ message: 'Invalid credentials' });
     }
 
-    const token = jwt.sign(
-      { id: user._id, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: '1d' }
-    );
+    const token = generateToken(user);
+
+    console.log(`✅ Login successful for ${email}`);
 
     res.status(200).json({
       message: 'Login successful',
