@@ -24,10 +24,13 @@ if (!fs.existsSync(uploadDir)) {
 // Serve static files for uploaded assignments
 app.use('/uploads/assignments', express.static(uploadDir));
 
-// MongoDB connection
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log('✅ Connected to MongoDB'))
-  .catch(err => console.error('❌ MongoDB connection error:', err));
+// ✅ FIXED: Use the correct env variable for MongoDB
+mongoose.connect(process.env.MONGO_URL, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true
+})
+.then(() => console.log('✅ Connected to MongoDB Atlas'))
+.catch(err => console.error('❌ MongoDB connection error:', err));
 
 // API Routes
 app.use('/api/auth', require('./routes/authRoutes'));
